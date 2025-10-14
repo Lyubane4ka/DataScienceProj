@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from pmdarima import auto_arima
 
 
 def processing(df):
@@ -80,4 +81,56 @@ def optimize_types(df):
         elif df[col].dtype == 'object':
             if df[col].nunique() / len(df) < 0.5:  # Если мало уникальных значений
                 df[col] = df[col].astype('category')
+    return df
+
+
+def processing_for_arima(df, target_column='price'):
+    print("\n" + "=" * 50)
+    print("ПРЕДОБРАБОТКА ДАННЫХ ДЛЯ ARIMA")
+    print("=" * 50)
+
+    # Ваша существующая логика обработки
+    missing_values = df.isnull().sum()
+    print("Пропущенные значения:")
+    print(missing_values[missing_values > 0])
+
+    if df.isnull().sum().sum() > 0:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+
+    print(f"Дубликатов до очистки: {df.duplicated().sum()}")
+    df = df.drop_duplicates()
+    print(f"Дубликатов после очистки: {df.duplicated().sum()}")
+
+    # Обработка выбросов
+    numeric_columns = ['carat', 'depth', 'table', 'price', 'x', 'y', 'z']
+    for col in numeric_columns:
+        if col in df.columns:
+            df = handle_outliers_iqr(df, col)
+
+    # Кодирование категориальных переменных
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        unique_count = df[col].nunique()
+        if unique_count <= 10:
+            dummies = pd.get_dummies(df[col], prefix=col)
+            df = pd.concat([df, dummies], axis=1)
+            df = df.drop(col, axis=1)
+        else:
+            from sklearn.preprocessing import LabelEncoder
+            le = LabelEncoder()
+            df[col] = le.fit_transform(df[col])
+
+    # Создание искусственного временного индекса
+    df = df.sort_values(by=target_column).reset_index(drop=True)
+    df['time_index'] = range(1, len(df) + 1)
+
+    df = optimize_types(df)
+    print("Типы данных после оптимизации:")
+    print(df.dtypes)
+
     return df
