@@ -1,6 +1,5 @@
-import pandas as pd
 import numpy as np
-from pmdarima import auto_arima
+import pandas as pd
 
 
 def processing(df):
@@ -22,7 +21,6 @@ def processing(df):
         categorical_cols = df.select_dtypes(include=['object']).columns
         for col in categorical_cols:
             df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
-
 
     print(f"Дубликатов до очистки: {df.duplicated().sum()}")
     df = df.drop_duplicates()
@@ -70,6 +68,7 @@ def handle_outliers_iqr(data, column):
     data.loc[:, column] = data[column].clip(lower=lower_bound, upper=upper_bound).astype('int64')
 
     return data
+
 
 # Оптимизация типов данных для экономии памяти
 def optimize_types(df):
